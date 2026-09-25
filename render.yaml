@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: aura-game
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: AURA_SECRET
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY_BASE64
+        sync: false
+      - key: NODE_VERSION
+        value: 20.11.0

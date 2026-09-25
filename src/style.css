@@ -1,0 +1,26 @@
+/* Сброс базовых отступов и фиксация размеров */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent; /* Убирает синюю вспышку при тапе на смартфонах */
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Запрещает случайный скролл страницы */
+  background-color: #05010d; /* Глубокий темный фон вокруг мобильного контейнера */
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none; /* Запрещает выделение текста при долгом нажатии */
+  -webkit-user-select: none;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

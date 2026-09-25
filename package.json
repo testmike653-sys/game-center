@@ -1,0 +1,36 @@
+{
+  "name": "game-center",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server.js",
+    "start:local": "concurrently -n SERVER,CLIENT -c blue,green \"npm run server\" \"npm run dev\"",
+    "start": "node server.js",
+    "postinstall": "npm run build"
+  },
+  "dependencies": {
+    "@vue/devtools-api": "^8.2.1",
+    "canvas-confetti": "^1.9.4",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
+    "firebase-admin": "^12.7.0",
+    "gsap": "^3.15.0",
+    "howler": "^2.2.4",
+    "pinia": "^4.0.3",
+    "pixi.js": "^8.21.0",
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "concurrently": "^9.1.0",
+    "vite": "^8.3.0"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}
