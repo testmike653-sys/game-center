@@ -5,8 +5,8 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import crypto from 'crypto';
-import { fileURLToPath } from 'url';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { db, admin } from './firebase.js';
 
 const app = express();
@@ -155,11 +155,8 @@ app.post('/api/sync', async (req, res) => {
 });
 
 // ============================================================================
-// РАЗДАЧА ФРОНТЕНДА (только для production)
+// РАЗДАЧА ФРОНТЕНДА (для production)
 // ============================================================================
-import path from 'path';
-import { fileURLToPath } from 'url';
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, 'dist');
 
