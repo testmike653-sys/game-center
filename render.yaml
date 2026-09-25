@@ -3,7 +3,8 @@ services:
     name: aura-game
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    rootDir: .
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     envVars:
       - key: AURA_SECRET
