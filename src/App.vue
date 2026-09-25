@@ -16,7 +16,7 @@
       <div class="coins-box">
         <span class="coin-icon">🪙</span>
         <span class="balance">{{ coins.toLocaleString() }}</span>
-        <span v-if="saving" class="saving-dot"></span>
+        <span v-if="isLive" class="live-dot" title="Синхронизировано"></span>
       </div>
     </header>
 
@@ -42,45 +42,92 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import StarTreasureGame from './components/StarTreasureGame.vue';
 import { getAuraUser, fetchCoins } from './services/auraApi';
+import { db } from './services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 // ============================================================================
 // СОСТОЯНИЕ
 // ============================================================================
 const user = ref(getAuraUser());
 const coins = ref(user.value.coins);
-const saving = ref(false);
+const isLive = ref(false);
+
+let unsubscribe = null;
 
 // ============================================================================
-// СИНХРОНИЗАЦИЯ БАЛАНСА ПРИ ЗАГРУЗКЕ
+// СИНХРОНИЗАЦИЯ В РЕАЛЬНОМ ВРЕМЕНИ (Firestore)
+// ============================================================================
+function startFirestoreListener() {
+  if (!user.value.userId) return;
+
+  const userDocRef = doc(db, 'aura_users', user.value.userId);
+
+  unsubscribe = onSnapshot(userDocRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const newBalance = data.coins || 0;
+
+        isLive.value = true;
+
+        if (newBalance !== coins.value) {
+          console.log('🔥 Firestore sync:', coins.value, '→', newBalance);
+          coins.value = newBalance;
+        }
+      } else {
+        console.warn('⚠️ User doc not found');
+        isLive.value = false;
+      }
+    },
+    (error) => {
+      console.error('❌ Firestore listener error:', error);
+      isLive.value = false;
+    }
+  );
+
+  console.log('👂 Firestore real-time listener started');
+}
+
+function stopFirestoreListener() {
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+    console.log('🔇 Firestore listener stopped');
+  }
+}
+
+// ============================================================================
+// ЖИЗНЕННЫЙ ЦИКЛ
 // ============================================================================
 onMounted(async () => {
   if (user.value.userId) {
     console.log('👤 Aura user:', user.value.name, '| ID:', user.value.userId);
 
+    // Один раз синхронизируем баланс при загрузке
     const actual = await fetchCoins(user.value.userId);
     if (actual !== null && actual !== coins.value) {
-      console.log('🔄 Баланс синхронизирован:', coins.value, '→', actual);
       coins.value = actual;
     }
+
+    startFirestoreListener();
   } else {
-    console.log('🌐 Демо-режим (игра открыта вне приложения)');
+    console.log('🌐 Демо-режим');
   }
 });
 
+onUnmounted(() => {
+  stopFirestoreListener();
+});
+
 // ============================================================================
-// ОБНОВЛЕНИЕ МОНЕТ ОТ ИГРЫ (приходит с сервера)
+// ОБНОВЛЕНИЕ МОНЕТ ОТ ИГРЫ
 // ============================================================================
 function handleCoinsUpdated(newBalance) {
-  saving.value = true;
+  console.log('💰 Баланс обновлён игрой:', newBalance);
   coins.value = newBalance;
-  console.log('💰 Баланс обновлён:', newBalance);
-
-  setTimeout(() => {
-    saving.value = false;
-  }, 500);
 }
 </script>
 
@@ -192,18 +239,20 @@ function handleCoinsUpdated(newBalance) {
   letter-spacing: 0.5px;
 }
 
-.saving-dot {
-  width: 6px;
-  height: 6px;
+/* Индикатор живой синхронизации */
+.live-dot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #FF2E80;
+  background: #22c55e;
   margin-left: 4px;
-  animation: pulse 1s infinite;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+  animation: pulse 1.5s infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
 }
 
 /* ============ ИГРА ============ */
@@ -245,34 +294,12 @@ function handleCoinsUpdated(newBalance) {
 
 /* ============ МОБИЛЬНАЯ АДАПТАЦИЯ ============ */
 @media (max-width: 600px) {
-  .aura-header {
-    padding: 10px 12px;
-  }
-
-  .avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 22px;
-  }
-
-  .user-name {
-    font-size: 13px;
-  }
-
-  .coins-box {
-    padding: 6px 12px;
-  }
-
-  .balance {
-    font-size: 16px;
-  }
-
-  .aura-footer {
-    padding: 6px 12px;
-  }
-
-  .footer-text {
-    font-size: 10px;
-  }
+  .aura-header { padding: 10px 12px; }
+  .avatar { width: 36px; height: 36px; font-size: 22px; }
+  .user-name { font-size: 13px; }
+  .coins-box { padding: 6px 12px; }
+  .balance { font-size: 16px; }
+  .aura-footer { padding: 6px 12px; }
+  .footer-text { font-size: 10px; }
 }
 </style>
