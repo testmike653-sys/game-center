@@ -39,7 +39,6 @@ export async function fetchCoins(userId) {
   }
 }
 
-// Принимает массив bets
 export async function placeBetAPI(userId, bets, ts, sig) {
   const res = await fetch(`${API_BASE}/api/bet`, {
     method: 'POST',

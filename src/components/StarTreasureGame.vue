@@ -1,6 +1,7 @@
 <template>
   <div class="starmaker-clone-viewport">
 
+    <!-- Шапка с ЖИВЫМИ джекпотами -->
     <header class="video-header">
       <div class="top-row">
         <button class="back-icon">‹</button>
@@ -41,6 +42,7 @@
       </div>
     </header>
 
+    <!-- Игровой движок PixiJS -->
     <div ref="canvasWrapper" class="engine-container">
       <div class="center-ui" v-show="!spinning">
         <span class="timer-text">
@@ -53,6 +55,7 @@
       </div>
     </div>
 
+    <!-- Страница истории -->
     <div v-if="showHistoryPage" class="history-full-page">
       <div class="history-page-header">
         <button class="back-icon" @click="showHistoryPage = false">‹</button>
@@ -76,6 +79,7 @@
       </div>
     </div>
 
+    <!-- Модалки результата -->
     <div v-if="showResultModal" class="result-overlay">
       <div v-if="isWin" class="modal-box win-box-modal">
         <button class="close-btn" @click="closeResult">×</button>
@@ -91,6 +95,7 @@
       </div>
     </div>
 
+    <!-- Нижняя панель (без дублирования баланса) -->
     <footer class="video-footer">
       <button
         v-if="!showBetModal"
@@ -131,11 +136,6 @@
           <strong>🟡 {{ totalBetTokens }}</strong>
         </div>
 
-        <div class="stat-item stat-center">
-          <span>Мои монеты</span>
-          <strong class="balance-value">🪙 {{ Math.floor(localBalance).toLocaleString('ru-RU') }}</strong>
-        </div>
-
         <div class="stat-item stat-right">
           <span>Сегодняшний бонус</span>
           <strong>🟡 0</strong>
@@ -161,11 +161,13 @@ const props = defineProps({
 
 const emit = defineEmits(['coins-updated']);
 
-const localBalance = ref(props.userCoins || 1000);
+const localBalance = ref(props.userCoins || 0);
 const isFromApp = computed(() => !!props.userId && !!props.userSig);
 
 watch(() => props.userCoins, (v) => {
-  if (v !== null && v !== undefined) localBalance.value = v;
+  if (v !== null && v !== undefined) {
+    localBalance.value = Math.max(0, v - totalBetTokens.value);
+  }
 });
 
 const canvasWrapper = ref(null);
@@ -494,6 +496,9 @@ function placeBet() {
   totalBetTokens.value += amount;
   localBalance.value -= amount;
 
+  // Моментально транслируем актуальное число в шапку App.vue
+  emit('coins-updated', localBalance.value);
+
   showBetModal.value = false;
 }
 
@@ -520,6 +525,7 @@ async function resolveBets() {
     }
 
     localBalance.value += totalWin;
+    emit('coins-updated', localBalance.value);
 
     spinToWinner(winIndex, {
       isWin: totalWin > 0,
@@ -567,6 +573,8 @@ async function resolveBets() {
     for (const bet of myBetsThisRound) {
       localBalance.value += bet.amount;
     }
+    emit('coins-updated', localBalance.value);
+
     loading.value = false;
     spinning.value = false;
     setTimeout(() => {
@@ -677,11 +685,9 @@ function closeResult() {
 .starmaker-clone-viewport {
   position: relative;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   margin: 0 auto;
   padding: 0;
-  padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #ffffff;
@@ -696,12 +702,11 @@ function closeResult() {
 @media (min-width: 500px) {
   .starmaker-clone-viewport {
     max-width: 430px;
-    height: 100vh;
   }
 }
 
 .video-header {
-  padding: 12px 16px 8px;
+  padding: 8px 16px 4px;
   z-index: 10;
   position: relative;
   flex-shrink: 0;
@@ -711,7 +716,7 @@ function closeResult() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .back-icon, .info-icon {
@@ -753,7 +758,7 @@ function closeResult() {
 .jackpots-row {
   display: flex;
   gap: 5px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .jackpot {
@@ -842,12 +847,12 @@ function closeResult() {
 }
 
 .video-footer {
-  padding: 0 16px 24px;
+  padding: 0 16px 16px;
   z-index: 20;
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -855,7 +860,7 @@ function closeResult() {
   background: linear-gradient(90deg, #f97316, #ec4899);
   border: none;
   border-radius: 30px;
-  padding: 16px;
+  padding: 14px;
   font-size: 15px;
   font-weight: 900;
   color: #fff;
@@ -876,9 +881,8 @@ function closeResult() {
   align-items: center;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 10px 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  gap: 6px;
 }
 
 .stat-item {
@@ -886,29 +890,12 @@ function closeResult() {
   flex-direction: column;
   font-size: 11px;
   color: #a855f7;
-  flex: 1;
-  min-width: 0;
 }
 
 .stat-item strong {
   font-size: 14px;
   color: #fff;
   margin-top: 3px;
-}
-
-.stat-center {
-  align-items: center;
-  flex: 1;
-  padding: 0 8px;
-  border-left: 1px solid rgba(168, 85, 247, 0.3);
-  border-right: 1px solid rgba(168, 85, 247, 0.3);
-}
-
-.stat-center .balance-value {
-  color: #facc15;
-  font-size: 16px;
-  font-weight: 900;
-  text-shadow: 0 0 8px rgba(250, 204, 21, 0.5);
 }
 
 .stat-right {
@@ -920,7 +907,7 @@ function closeResult() {
   border-radius: 20px 20px 0 0;
   padding: 20px;
   position: absolute;
-  bottom: 74px;
+  bottom: 64px;
   left: 0;
   width: 100%;
   box-sizing: border-box;

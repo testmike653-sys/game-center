@@ -1,6 +1,3 @@
-// ============================================================================
-// AURA · Локальный сервер игры (Express)
-// ============================================================================
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
@@ -15,18 +12,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ============================================================================
-// СЕКРЕТ
-// ============================================================================
 const AURA_SECRET = process.env.AURA_SECRET;
 if (!AURA_SECRET) {
   throw new Error('AURA_SECRET не задан в .env');
 }
 
-// ============================================================================
-// ПРОВЕРКА HMAC-ПОДПИСИ
-// Формат: HMAC_SHA256(userId|ts) → base64url (без padding)
-// ============================================================================
 function verifySignature(userId, ts, signature) {
   const data = `${userId}|${ts}`;
   const expected = crypto
@@ -34,16 +24,12 @@ function verifySignature(userId, ts, signature) {
     .update(data)
     .digest('base64url');
 
-  // Timing-safe сравнение
   const a = Buffer.from(expected);
   const b = Buffer.from(String(signature || ''));
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
 }
 
-// ============================================================================
-// РАНДОМ (та же математика)
-// ============================================================================
 function rollWinner() {
   const r = Math.random() * 100;
   if (r < 0.5)  return { index: 7, mult: 50 };
@@ -56,9 +42,6 @@ function rollWinner() {
   return { index: 0, mult: 5 };
 }
 
-// ============================================================================
-// HEALTH CHECK
-// ============================================================================
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'aura-game', time: Date.now() });
 });
@@ -67,7 +50,6 @@ app.post('/api/bet', async (req, res) => {
   try {
     const { userId, bets, ts, sig } = req.body;
 
-    // 1. ВАЛИДАЦИЯ ЮЗЕРА И МАССИВА СТАВОК
     if (!userId || typeof userId !== 'string' || userId.length > 50) {
       return res.status(400).json({ success: false, error: 'Invalid userId' });
     }
@@ -75,7 +57,6 @@ app.post('/api/bet', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid bets array' });
     }
 
-    // Проверяем каждую ставку и вычисляем общую сумму
     let totalBetAmount = 0;
     for (const b of bets) {
       const amount = Number(b.amount);
@@ -90,7 +71,6 @@ app.post('/api/bet', async (req, res) => {
       totalBetAmount += amount;
     }
 
-    // 2. ПРОВЕРКА ПОДПИСИ И ВРЕМЕНИ
     const tsNum = parseInt(ts, 10);
     if (!tsNum || Math.abs(Date.now() - tsNum) > 3600000) {
       return res.status(401).json({ success: false, error: 'Token expired' });
@@ -99,7 +79,6 @@ app.post('/api/bet', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Invalid signature' });
     }
 
-    // 3. ТРАНЗАКЦИЯ FIRESTORE
     const userRef = db.collection('aura_users').doc(userId);
 
     const result = await db.runTransaction(async (t) => {
@@ -112,13 +91,9 @@ app.post('/api/bet', async (req, res) => {
       const balance = userData.coins || 0;
       if (balance < totalBetAmount) throw new Error('Insufficient balance');
 
-      // Списываем общую сумму ставок
       const afterBet = balance - totalBetAmount;
-
-      // Генерируем ОДНУ выигрышную планету на весь раунд
       const winner = rollWinner();
 
-      // Считаем выигрыш ТОЛЬКО по той планете, которая реально выпала
       let totalWin = 0;
       for (const b of bets) {
         if (b.planetIndex === winner.index) {
@@ -126,7 +101,6 @@ app.post('/api/bet', async (req, res) => {
         }
       }
 
-      // Итоговый баланс: остаток после ставок + выигрыш
       const finalBalance = afterBet + totalWin;
 
       t.update(userRef, {
@@ -152,9 +126,6 @@ app.post('/api/bet', async (req, res) => {
   }
 });
 
-// ============================================================================
-// POST /api/sync — синхронизация баланса
-// ============================================================================
 app.post('/api/sync', async (req, res) => {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'No userId' });
@@ -174,27 +145,16 @@ app.post('/api/sync', async (req, res) => {
   }
 });
 
-// ============================================================================
-// РАЗДАЧА ФРОНТЕНДА (для production)
-// ============================================================================
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, 'dist');
 
-// Отдаём статику (собранный Vue)
 app.use(express.static(distPath));
 
-// SPA fallback — все остальные маршруты отдают index.html
 app.get('*', (req, res) => {
-  // Пропускаем /api/* — их обрабатывают выше
   if (req.path.startsWith('/api/')) return;
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// ============================================================================
-// СТАРТ
-// ============================================================================
 app.listen(PORT, () => {
   console.log(`🎮 Aura game server running on http://localhost:${PORT}`);
-  console.log(`   POST http://localhost:${PORT}/api/bet`);
-  console.log(`   POST http://localhost:${PORT}/api/sync`);
 });

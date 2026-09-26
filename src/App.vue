@@ -1,7 +1,6 @@
 <template>
   <main class="app-shell">
-    <!-- ⭐ ШАПКА С ДАННЫМИ ЮЗЕРА -->
-    <header v-if="user.isFromApp" class="aura-header">
+    <header class="aura-header">
       <div class="user-info">
         <span class="avatar">{{ user.avatar }}</span>
         <div class="user-text">
@@ -9,18 +8,17 @@
             {{ user.name }}
             <span v-if="user.isVip" class="vip-badge">VIP</span>
           </div>
-          <div class="user-id">ID: {{ user.userId }}</div>
+          <div class="user-id">ID: {{ user.userId || 'DEMO' }}</div>
         </div>
       </div>
 
       <div class="coins-box">
         <span class="coin-icon">🪙</span>
-        <span class="balance">{{ coins.toLocaleString() }}</span>
+        <span class="balance">{{ Math.floor(coins).toLocaleString('ru-RU') }}</span>
         <span v-if="isLive" class="live-dot" title="Синхронизировано"></span>
       </div>
     </header>
 
-    <!-- ⭐ ИГРА -->
     <div class="game-wrapper">
       <StarTreasureGame
         :user-coins="coins"
@@ -31,13 +29,6 @@
         @coins-updated="handleCoinsUpdated"
       />
     </div>
-
-    <!-- ⭐ ФУТЕР -->
-    <footer class="aura-footer">
-      <span class="footer-text">
-        🎤 Играйте и зарабатывайте монеты в <strong>Aura</strong>
-      </span>
-    </footer>
   </main>
 </template>
 
@@ -48,18 +39,12 @@ import { getAuraUser, fetchCoins } from './services/auraApi';
 import { db } from './services/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 
-// ============================================================================
-// СОСТОЯНИЕ
-// ============================================================================
 const user = ref(getAuraUser());
-const coins = ref(user.value.coins);
+const coins = ref(user.value.coins || 1000);
 const isLive = ref(false);
 
 let unsubscribe = null;
 
-// ============================================================================
-// СИНХРОНИЗАЦИЯ В РЕАЛЬНОМ ВРЕМЕНИ (Firestore)
-// ============================================================================
 function startFirestoreListener() {
   if (!user.value.userId) return;
 
@@ -72,13 +57,8 @@ function startFirestoreListener() {
         const newBalance = data.coins || 0;
 
         isLive.value = true;
-
-        if (newBalance !== coins.value) {
-          console.log('🔥 Firestore sync:', coins.value, '→', newBalance);
-          coins.value = newBalance;
-        }
+        coins.value = newBalance;
       } else {
-        console.warn('⚠️ User doc not found');
         isLive.value = false;
       }
     },
@@ -87,34 +67,22 @@ function startFirestoreListener() {
       isLive.value = false;
     }
   );
-
-  console.log('👂 Firestore real-time listener started');
 }
 
 function stopFirestoreListener() {
   if (unsubscribe) {
     unsubscribe();
     unsubscribe = null;
-    console.log('🔇 Firestore listener stopped');
   }
 }
 
-// ============================================================================
-// ЖИЗНЕННЫЙ ЦИКЛ
-// ============================================================================
 onMounted(async () => {
   if (user.value.userId) {
-    console.log('👤 Aura user:', user.value.name, '| ID:', user.value.userId);
-
-    // Один раз синхронизируем баланс при загрузке
     const actual = await fetchCoins(user.value.userId);
-    if (actual !== null && actual !== coins.value) {
+    if (actual !== null) {
       coins.value = actual;
     }
-
     startFirestoreListener();
-  } else {
-    console.log('🌐 Демо-режим');
   }
 });
 
@@ -122,11 +90,7 @@ onUnmounted(() => {
   stopFirestoreListener();
 });
 
-// ============================================================================
-// ОБНОВЛЕНИЕ МОНЕТ ОТ ИГРЫ
-// ============================================================================
 function handleCoinsUpdated(newBalance) {
-  console.log('💰 Баланс обновлён игрой:', newBalance);
   coins.value = newBalance;
 }
 </script>
@@ -139,6 +103,7 @@ function handleCoinsUpdated(newBalance) {
 .app-shell {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background-color: #05010d;
@@ -146,22 +111,18 @@ function handleCoinsUpdated(newBalance) {
   position: relative;
 }
 
-/* ============ ШАПКА ============ */
 .aura-header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
   z-index: 100;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: linear-gradient(180deg, rgba(5, 1, 13, 0.95) 0%, rgba(5, 1, 13, 0.6) 100%);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+  padding: 10px 16px;
+  background: linear-gradient(180deg, rgba(5, 1, 13, 0.98) 0%, rgba(14, 5, 28, 0.95) 100%);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #F6F2E8;
+  flex-shrink: 0;
 }
 
 .user-info {
@@ -172,15 +133,15 @@ function handleCoinsUpdated(newBalance) {
 }
 
 .avatar {
-  font-size: 28px;
-  width: 42px;
-  height: 42px;
+  font-size: 24px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #FF2E80, #D4AF37);
   border-radius: 50%;
-  box-shadow: 0 0 20px rgba(255, 46, 128, 0.4);
+  box-shadow: 0 0 15px rgba(255, 46, 128, 0.4);
   flex-shrink: 0;
 }
 
@@ -210,21 +171,19 @@ function handleCoinsUpdated(newBalance) {
 
 .user-id {
   font-size: 10px;
-  color: #6B6862;
+  color: #A8A29A;
   margin-top: 1px;
 }
 
-/* ============ МОНЕТЫ ============ */
 .coins-box {
   display: flex;
   align-items: center;
   gap: 6px;
   background: rgba(212, 175, 55, 0.15);
-  padding: 8px 14px;
+  padding: 6px 14px;
   border-radius: 14px;
   border: 1px solid rgba(212, 175, 55, 0.4);
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
-  position: relative;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
 }
 
 .coin-icon {
@@ -233,13 +192,12 @@ function handleCoinsUpdated(newBalance) {
 }
 
 .balance {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: #D4AF37;
   letter-spacing: 0.5px;
 }
 
-/* Индикатор живой синхронизации */
 .live-dot {
   width: 8px;
   height: 8px;
@@ -255,51 +213,12 @@ function handleCoinsUpdated(newBalance) {
   50% { opacity: 0.5; transform: scale(0.85); }
 }
 
-/* ============ ИГРА ============ */
 .game-wrapper {
   flex: 1;
   width: 100%;
+  min-height: 0;
   display: flex;
-  justify-content: center;
-  align-items: center;
   overflow: hidden;
   position: relative;
-}
-
-/* ============ ФУТЕР ============ */
-.aura-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  padding: 8px 16px;
-  text-align: center;
-  background: linear-gradient(0deg, rgba(5, 1, 13, 0.95) 0%, rgba(5, 1, 13, 0.6) 100%);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(212, 175, 55, 0.1);
-  font-family: 'Inter', sans-serif;
-}
-
-.footer-text {
-  font-size: 11px;
-  color: #A8A29A;
-  letter-spacing: 0.5px;
-}
-
-.footer-text strong {
-  color: #D4AF37;
-  font-weight: 700;
-}
-
-/* ============ МОБИЛЬНАЯ АДАПТАЦИЯ ============ */
-@media (max-width: 600px) {
-  .aura-header { padding: 10px 12px; }
-  .avatar { width: 36px; height: 36px; font-size: 22px; }
-  .user-name { font-size: 13px; }
-  .coins-box { padding: 6px 12px; }
-  .balance { font-size: 16px; }
-  .aura-footer { padding: 6px 12px; }
-  .footer-text { font-size: 10px; }
 }
 </style>
