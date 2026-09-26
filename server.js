@@ -63,25 +63,34 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'aura-game', time: Date.now() });
 });
 
-// ============================================================================
-// POST /api/bet — ставка
-// ============================================================================
 app.post('/api/bet', async (req, res) => {
   try {
-    const { userId, betAmount, planetIndex, ts, sig } = req.body;
+    const { userId, bets, ts, sig } = req.body;
 
-    // 1. ВАЛИДАЦИЯ
+    // 1. ВАЛИДАЦИЯ ЮЗЕРА И МАССИВА СТАВОК
     if (!userId || typeof userId !== 'string' || userId.length > 50) {
       return res.status(400).json({ success: false, error: 'Invalid userId' });
     }
-    if (!Number.isInteger(betAmount) || betAmount <= 0 || betAmount > 100000) {
-      return res.status(400).json({ success: false, error: 'Invalid betAmount' });
-    }
-    if (!Number.isInteger(planetIndex) || planetIndex < 0 || planetIndex > 7) {
-      return res.status(400).json({ success: false, error: 'Invalid planetIndex' });
+    if (!Array.isArray(bets) || bets.length === 0) {
+      return res.status(400).json({ success: false, error: 'Invalid bets array' });
     }
 
-    // 2. ПОДПИСЬ
+    // Проверяем каждую ставку и вычисляем общую сумму
+    let totalBetAmount = 0;
+    for (const b of bets) {
+      const amount = Number(b.amount);
+      const planetIndex = Number(b.planetIndex);
+
+      if (!Number.isInteger(amount) || amount <= 0 || amount > 100000) {
+        return res.status(400).json({ success: false, error: 'Invalid bet amount' });
+      }
+      if (!Number.isInteger(planetIndex) || planetIndex < 0 || planetIndex > 7) {
+        return res.status(400).json({ success: false, error: 'Invalid planetIndex' });
+      }
+      totalBetAmount += amount;
+    }
+
+    // 2. ПРОВЕРКА ПОДПИСИ И ВРЕМЕНИ
     const tsNum = parseInt(ts, 10);
     if (!tsNum || Math.abs(Date.now() - tsNum) > 3600000) {
       return res.status(401).json({ success: false, error: 'Token expired' });
@@ -101,13 +110,24 @@ app.post('/api/bet', async (req, res) => {
       if (userData.isBanned === true) throw new Error('User banned');
 
       const balance = userData.coins || 0;
-      if (balance < betAmount) throw new Error('Insufficient balance');
+      if (balance < totalBetAmount) throw new Error('Insufficient balance');
 
-      const afterBet = balance - betAmount;
+      // Списываем общую сумму ставок
+      const afterBet = balance - totalBetAmount;
+
+      // Генерируем ОДНУ выигрышную планету на весь раунд
       const winner = rollWinner();
-      const isWin = winner.index === planetIndex;
-      const winAmount = isWin ? betAmount * winner.mult : 0;
-      const finalBalance = afterBet + winAmount;
+
+      // Считаем выигрыш ТОЛЬКО по той планете, которая реально выпала
+      let totalWin = 0;
+      for (const b of bets) {
+        if (b.planetIndex === winner.index) {
+          totalWin += Number(b.amount) * winner.mult;
+        }
+      }
+
+      // Итоговый баланс: остаток после ставок + выигрыш
+      const finalBalance = afterBet + totalWin;
 
       t.update(userRef, {
         coins: finalBalance,
@@ -118,8 +138,8 @@ app.post('/api/bet', async (req, res) => {
       return {
         winnerIndex: winner.index,
         mult: winner.mult,
-        isWin,
-        winAmount,
+        isWin: totalWin > 0,
+        winAmount: totalWin,
         newBalance: finalBalance,
       };
     });

@@ -597,30 +597,19 @@ async function resolveBets() {
 
   // ---------- РЕЖИМ ПРИЛОЖЕНИЯ ----------
   try {
-    let winnerIndex = null;
-    let mult = 5;
-    let serverBalance = null;
+    // Отправляем весь массив ставок (myBetsThisRound) разом
+    const result = await placeBetAPI(
+      props.userId,
+      myBetsThisRound,
+      props.userTs,
+      props.userSig
+    );
 
-    for (let i = 0; i < myBetsThisRound.length; i++) {
-      const bet = myBetsThisRound[i];
-      const balanceBefore = (serverBalance ?? localBalance.value) + bet.amount;
+    const winnerIndex = result.winnerIndex;
+    const mult = result.mult;
+    const serverBalance = result.newBalance;
 
-      const result = await placeBetAPI(
-        props.userId,
-        bet.amount,
-        bet.planetIndex,
-        balanceBefore,
-        props.userTs,
-        props.userSig,
-      );
-
-      if (i === 0) {
-        winnerIndex = result.winnerIndex;
-        mult = result.mult;
-      }
-      serverBalance = result.newBalance;
-    }
-
+    // Считаем выигрыш только для той планеты, которая победила
     let totalWin = 0;
     for (const bet of myBetsThisRound) {
       if (bet.planetIndex === winnerIndex) {
@@ -628,9 +617,11 @@ async function resolveBets() {
       }
     }
 
+    // Применяем новый баланс с сервера
     localBalance.value = serverBalance;
     emit('coins-updated', serverBalance);
 
+    // Крутим рулетку к победной планете
     spinToWinner(winnerIndex, {
       isWin: totalWin > 0,
       winAmount: totalWin,
@@ -642,6 +633,7 @@ async function resolveBets() {
     console.error('❌ Ошибка ставки:', e);
     alert('Ошибка: ' + e.message);
 
+    // Возвращаем списанные монеты при ошибке сети
     for (const bet of myBetsThisRound) {
       localBalance.value += bet.amount;
     }
@@ -649,7 +641,6 @@ async function resolveBets() {
     spinning.value = false;
     setTimeout(() => { currentRound.value++; startRound(); }, 1500);
   }
-}
 
 // ============================================================================
 // СПИН БЕЗ СТАВОК

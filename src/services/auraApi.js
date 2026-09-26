@@ -50,11 +50,11 @@ export async function fetchCoins(userId) {
 // ============================================================================
 // СТАВКА
 // ============================================================================
-export async function placeBetAPI(userId, betAmount, planetIndex, _balance, ts, sig) {
+export async function placeBetAPI(userId, bets, ts, sig) {
   const res = await fetch(`${API_BASE}/api/bet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, betAmount, planetIndex, ts, sig }),
+    body: JSON.stringify({ userId, bets, ts, sig }),
   });
 
   const data = await res.json();
