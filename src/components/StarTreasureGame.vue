@@ -1,7 +1,6 @@
 <template>
   <div class="starmaker-clone-viewport">
 
-    <!-- Шапка с ЖИВЫМИ джекпотами -->
     <header class="video-header">
       <div class="top-row">
         <button class="back-icon">‹</button>
@@ -42,7 +41,6 @@
       </div>
     </header>
 
-    <!-- Игровой движок PixiJS -->
     <div ref="canvasWrapper" class="engine-container">
       <div class="center-ui" v-show="!spinning">
         <span class="timer-text">
@@ -55,7 +53,6 @@
       </div>
     </div>
 
-    <!-- Страница истории -->
     <div v-if="showHistoryPage" class="history-full-page">
       <div class="history-page-header">
         <button class="back-icon" @click="showHistoryPage = false">‹</button>
@@ -79,7 +76,6 @@
       </div>
     </div>
 
-    <!-- Модалки результата -->
     <div v-if="showResultModal" class="result-overlay">
       <div v-if="isWin" class="modal-box win-box-modal">
         <button class="close-btn" @click="closeResult">×</button>
@@ -95,7 +91,6 @@
       </div>
     </div>
 
-    <!-- Нижняя панель (без дублирования баланса) -->
     <footer class="video-footer">
       <button
         v-if="!showBetModal"
@@ -166,7 +161,9 @@ const isFromApp = computed(() => !!props.userId && !!props.userSig);
 
 watch(() => props.userCoins, (v) => {
   if (v !== null && v !== undefined) {
-    localBalance.value = Math.max(0, v - totalBetTokens.value);
+    if (!spinning.value && !loading.value) {
+      localBalance.value = v;
+    }
   }
 });
 
@@ -219,6 +216,7 @@ let wheelContainer = null;
 const planetsArray = [];
 let portalSprite = null;
 let bgSprite = null;
+let winPointer = null;
 
 onMounted(async () => {
   await nextTick();
@@ -394,6 +392,19 @@ async function initPixiEngine() {
     planetsArray.push({ group: planetWrapper, highlight, sprite: spr, betText: betAmountText });
   }
 
+  // ⭐ Добавляем красную стрелку-указатель победной планеты
+  winPointer = new Text({
+    text: '▼',
+    style: new TextStyle({
+      fontSize: 42,
+      fill: '#ff0000',
+      stroke: { color: '#ffffff', width: 4 },
+      dropShadow: { color: '#000', blur: 4, distance: 2 }
+    })
+  });
+  winPointer.anchor.set(0.5, 1);
+  app.stage.addChild(winPointer);
+
   function layout() {
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -434,6 +445,12 @@ async function initPixiEngine() {
         planetsArray[i].sprite.height = 66 * scale;
       }
       planetsArray[i].group.scale.set(scale);
+    }
+
+    // Позиционируем стрелочку строго над верхним краем колеса
+    if (winPointer) {
+      winPointer.x = cx;
+      winPointer.y = cy - radius - (35 * scale);
     }
   }
 
@@ -496,9 +513,7 @@ function placeBet() {
   totalBetTokens.value += amount;
   localBalance.value -= amount;
 
-  // Моментально транслируем актуальное число в шапку App.vue
   emit('coins-updated', localBalance.value);
-
   showBetModal.value = false;
 }
 
@@ -519,8 +534,8 @@ async function resolveBets() {
 
     let totalWin = 0;
     for (const bet of myBetsThisRound) {
-      if (bet.planetIndex === winIndex) {
-        totalWin += bet.amount * mult;
+      if (Number(bet.planetIndex) === winIndex) {
+        totalWin += Number(bet.amount) * mult;
       }
     }
 
@@ -545,14 +560,14 @@ async function resolveBets() {
       props.userSig
     );
 
-    const winnerIndex = result.winnerIndex;
-    const mult = result.mult;
+    const winnerIndex = Number(result.winnerIndex);
+    const mult = Number(result.mult);
     const serverBalance = result.newBalance;
 
     let totalWin = 0;
     for (const bet of myBetsThisRound) {
-      if (bet.planetIndex === winnerIndex) {
-        totalWin += bet.amount * mult;
+      if (Number(bet.planetIndex) === winnerIndex) {
+        totalWin += Number(bet.amount) * mult;
       }
     }
 
@@ -571,7 +586,7 @@ async function resolveBets() {
     alert('Ошибка: ' + e.message);
 
     for (const bet of myBetsThisRound) {
-      localBalance.value += bet.amount;
+      localBalance.value += Number(bet.amount);
     }
     emit('coins-updated', localBalance.value);
 
@@ -609,6 +624,11 @@ function spinWheelOnly() {
     duration: 5,
     ease: 'power3.out',
     onComplete: () => {
+      // ⭐ Подсвечиваем победную планету
+      planetsArray.forEach((p, i) => {
+        p.highlight.visible = (i === winIndex);
+      });
+
       roundHistory.value.unshift({
         round: currentRound.value,
         mult,
@@ -638,6 +658,11 @@ function spinToWinner(winIndex, result) {
     duration: 5,
     ease: 'power3.out',
     onComplete: () => {
+      // ⭐ Подсвечиваем победную планету
+      planetsArray.forEach((p, i) => {
+        p.highlight.visible = (i === winIndex);
+      });
+
       isWin.value = result.isWin;
       winAmount.value = result.winAmount;
       showResultModal.value = true;
@@ -685,9 +710,11 @@ function closeResult() {
 .starmaker-clone-viewport {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   margin: 0 auto;
   padding: 0;
+  padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #ffffff;
@@ -702,11 +729,12 @@ function closeResult() {
 @media (min-width: 500px) {
   .starmaker-clone-viewport {
     max-width: 430px;
+    height: 100vh;
   }
 }
 
 .video-header {
-  padding: 8px 16px 4px;
+  padding: 12px 16px 8px;
   z-index: 10;
   position: relative;
   flex-shrink: 0;
@@ -716,7 +744,7 @@ function closeResult() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .back-icon, .info-icon {
@@ -758,7 +786,7 @@ function closeResult() {
 .jackpots-row {
   display: flex;
   gap: 5px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .jackpot {
@@ -847,12 +875,12 @@ function closeResult() {
 }
 
 .video-footer {
-  padding: 0 16px 16px;
+  padding: 0 16px 24px;
   z-index: 20;
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   flex-shrink: 0;
 }
 
@@ -860,7 +888,7 @@ function closeResult() {
   background: linear-gradient(90deg, #f97316, #ec4899);
   border: none;
   border-radius: 30px;
-  padding: 14px;
+  padding: 16px;
   font-size: 15px;
   font-weight: 900;
   color: #fff;
@@ -881,8 +909,9 @@ function closeResult() {
   align-items: center;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 12px;
-  padding: 10px 16px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 6px;
 }
 
 .stat-item {
@@ -890,6 +919,8 @@ function closeResult() {
   flex-direction: column;
   font-size: 11px;
   color: #a855f7;
+  flex: 1;
+  min-width: 0;
 }
 
 .stat-item strong {
@@ -907,7 +938,7 @@ function closeResult() {
   border-radius: 20px 20px 0 0;
   padding: 20px;
   position: absolute;
-  bottom: 64px;
+  bottom: 74px;
   left: 0;
   width: 100%;
   box-sizing: border-box;

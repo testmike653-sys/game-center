@@ -58,6 +58,9 @@ app.post('/api/bet', async (req, res) => {
     }
 
     let totalBetAmount = 0;
+    const parsedBets = [];
+
+    // Строгая проверка всех ставок
     for (const b of bets) {
       const amount = Number(b.amount);
       const planetIndex = Number(b.planetIndex);
@@ -69,6 +72,7 @@ app.post('/api/bet', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Invalid planetIndex' });
       }
       totalBetAmount += amount;
+      parsedBets.push({ planetIndex, amount });
     }
 
     const tsNum = parseInt(ts, 10);
@@ -91,16 +95,21 @@ app.post('/api/bet', async (req, res) => {
       const balance = userData.coins || 0;
       if (balance < totalBetAmount) throw new Error('Insufficient balance');
 
+      // 1. Сразу списываем все ставки со счёта (проигравшие планеты теряют монеты)
       const afterBet = balance - totalBetAmount;
+
+      // 2. Бросаем рулетку — выпадает только ОДНА планета
       const winner = rollWinner();
 
+      // 3. Вычисляем выигрыш ТОЛЬКО для тех ставок, которые попали в победную планету
       let totalWin = 0;
-      for (const b of bets) {
+      for (const b of parsedBets) {
         if (b.planetIndex === winner.index) {
-          totalWin += Number(b.amount) * winner.mult;
+          totalWin += b.amount * winner.mult;
         }
       }
 
+      // 4. Итоговый баланс (остаток + только выигрышная планета)
       const finalBalance = afterBet + totalWin;
 
       t.update(userRef, {
