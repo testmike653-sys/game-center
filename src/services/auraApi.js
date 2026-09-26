@@ -2,13 +2,8 @@
 // AURA · API-клиент игры
 // ============================================================================
 
-// В dev — проксируется через Vite на localhost:3000
-// В prod — тот же origin (если сервер раздаёт и фронт, и API)
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
-// ============================================================================
-// ДАННЫЕ ЮЗЕРА ИЗ URL (передаёт Flutter-приложение)
-// ============================================================================
 export function getAuraUser() {
   const params = new URLSearchParams(window.location.search);
 
@@ -28,9 +23,6 @@ export function getAuraUser() {
   };
 }
 
-// ============================================================================
-// СИНХРОНИЗАЦИЯ БАЛАНСА
-// ============================================================================
 export async function fetchCoins(userId) {
   try {
     const res = await fetch(`${API_BASE}/api/sync`, {
@@ -47,9 +39,7 @@ export async function fetchCoins(userId) {
   }
 }
 
-// ============================================================================
-// СТАВКА
-// ============================================================================
+// Принимает массив bets
 export async function placeBetAPI(userId, bets, ts, sig) {
   const res = await fetch(`${API_BASE}/api/bet`, {
     method: 'POST',
